@@ -1,0 +1,3 @@
+amqp_url: amqp://localhost
+storage: local
+threads: <%= Executor::cpu_count %>
