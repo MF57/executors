@@ -1,5 +1,7 @@
 {
   "dependencies": {
-    "async": "^1.5.2"
+    "async": "^1.5.2",
+    "aws-sdk": "^2.163.0",
+    "bluebird": "^3.5.1"
   }
 }
