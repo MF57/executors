@@ -1,5 +1,6 @@
-{ "dependencies": {
-  "gcloud": "^0.37.0",
-  "async":  "^1.5.2"
-  }
+{
+	"dependencies": {
+		"google-cloud": "^0.57.0",
+		"async": "^1.5.2"
+	}
 }
