@@ -42,3 +42,14 @@ jspm_packages
 mDiff
 mFitplane
 mProjectPP
+mAdd
+mAddExec
+mBackground
+mBgModel
+mConcatFit
+mDiffFit
+mImgtbl
+mJPEG
+mShrink
+
+bin/
