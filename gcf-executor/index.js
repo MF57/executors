@@ -87,12 +87,12 @@ exports.hyperflow_executor = function (req, res) {
         });
 
         proc.on('close', function (code) {
-            console.log('My GCF exe close' + executable);
+            console.log('My GCF exe close ' + executable + ' with code ' + code);
             callback()
         });
 
         proc.on('exit', function (code) {
-            console.log('My GCF exe exit' + executable);
+            console.log('My GCF exe exit' + executable + ' with code ' + code);
         });
 
     }
@@ -136,7 +136,7 @@ exports.hyperflow_executor = function (req, res) {
         download,
         execute,
         upload
-    ], function (err, result) {
+    ], function (err) {
         if (err) {
             console.error('Error: ' + err);
             res.status(400).send('Bad Request ' + JSON.stringify(err));

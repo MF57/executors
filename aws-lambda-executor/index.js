@@ -7,39 +7,39 @@ const s3 = new AWS.S3({signatureVersion: 'v4'});
 const Promise = require('bluebird');
 const fs = require('fs');
 
-exports.handler = function (event, context, callback) {
-    const printDir = function (p) {
-        const path = require("path");
-
-        return new Promise(function (resolve, reject) {
-            fs.readdir(p, function (err, files) {
-                if (err) {
-                    throw err;
-                }
-
-                console.log("Logging all files");
-                console.log("FILES: " + files);
-
-                files.map(function (file) {
-                    return path.join(p, file);
-                }).filter(function (file) {
-                    return fs.statSync(file).isFile();
-                }).forEach(function (file) {
-                    const stats = fs.statSync(file);
-                    const fileSizeInBytes = stats["size"];
-                    //Convert the file size to megabytes (optional)
-                    const fileSizeInMegabytes = fileSizeInBytes / 1000000.0;
-
-                    console.log("%s (%s) (%s)", file, fileSizeInMegabytes, path.extname(file));
-                });
-                resolve();
-            });
-        })
-    };
+exports.handler = function (event, context) {
+    // const printDir = function (p) {
+    //     const path = require("path");
+    //
+    //     return new Promise(function (resolve, reject) {
+    //         fs.readdir(p, function (err, files) {
+    //             if (err) {
+    //                 throw err;
+    //             }
+    //
+    //             console.log("Logging all files");
+    //             console.log("FILES: " + files);
+    //
+    //             files.map(function (file) {
+    //                 return path.join(p, file);
+    //             }).filter(function (file) {
+    //                 return fs.statSync(file).isFile();
+    //             }).forEach(function (file) {
+    //                 const stats = fs.statSync(file);
+    //                 const fileSizeInBytes = stats["size"];
+    //                 //Convert the file size to megabytes (optional)
+    //                 const fileSizeInMegabytes = fileSizeInBytes / 1000000.0;
+    //
+    //                 console.log("%s (%s) (%s)", file, fileSizeInMegabytes, path.extname(file));
+    //             });
+    //             resolve();
+    //         });
+    //     })
+    // };
 
     console.log(event);
 
-    json_request = JSON.parse(event.body);
+    const json_request = JSON.parse(event.body);
 
     const executable = json_request.executable;
     const args = json_request.args;
@@ -107,13 +107,11 @@ exports.handler = function (event, context, callback) {
             }).then(function() {
                 return new Promise(function (resolve, reject) {
                     s3.getObject(params).createReadStream().on('end', function () {
-                        console.log("UDALO SIE POBRAC");
                         return resolve();
                     }).on('error', function (error) {
-                        console.log("NIEEE UDALO SIE POBRAC");
                         return reject(error);
                     }).pipe(file)
-                }).then(function (result) {
+                }).then(function () {
                     callback();
                 }, function (err) {
                     err['file_name'] = file_name;
@@ -164,13 +162,13 @@ exports.handler = function (event, context, callback) {
         });
 
         proc.on('close', function (code) {
-            console.log('Lambda exe close' + executable);
+            console.log('Lambda exe close' + executable  + ' with code ' + code);
             callback();
            //  printDir('/tmp').then(function(result) { callback() }, function(err) { callback(err) });
         });
 
         proc.on('exit', function (code) {
-            console.log('Lambda exe exit' + executable);
+            console.log('Lambda exe exit' + executable + ' with code ' + code);
         });
 
     }
@@ -192,7 +190,7 @@ exports.handler = function (event, context, callback) {
                 }
             });
             fileStream.on('open', function () {
-                var params = {
+                const params = {
                     Bucket: bucket_name,
                     Key: prefix + '/' + file_name,
                     Body: fileStream
@@ -227,8 +225,8 @@ exports.handler = function (event, context, callback) {
         download,
         execute,
         upload
-    ], function (err, result) {
-        var response;
+    ], function (err) {
+        let response;
         if (err) {
             response = {
                 statusCode: '400',
@@ -241,27 +239,27 @@ exports.handler = function (event, context, callback) {
             console.log('Success');
             total_end = Date.now();
 
-            var duration = total_end - total_start;
-            var download_duration = execute_start - download_start;
-            var execution_duration = upload_start - execute_start;
-            var upload_duration = total_end - upload_start;
+            const duration = total_end - total_start;
+            const download_duration = execute_start - download_start;
+            const execution_duration = upload_start - execute_start;
+            const upload_duration = total_end - upload_start;
 
-            var message = 'AWS Lambda Function exit: start ' + total_start + ' end ' + total_end + ' duration ' + duration + ' ms, executable: ' + executable + ' args: ' + args;
+            let message = 'AWS Lambda Function exit: start ' + total_start + ' end ' + total_end + ' duration ' + duration + ' ms, executable: ' + executable + ' args: ' + args;
             message += ' download time: ' + download_duration + ' ms, execution time: ' + execution_duration + ' ms, upload time ' + upload_duration + ' ms';
 
-            var body = {
-                message: message,
-                duration: duration,
-                executable: executable,
-                args: args,
-                download_duration: download_duration,
-                execution_duration: execution_duration,
-                upload_duration: upload_duration
-            };
+            // const body = {
+            //     message: message,
+            //     duration: duration,
+            //     executable: executable,
+            //     args: args,
+            //     download_duration: download_duration,
+            //     execution_duration: execution_duration,
+            //     upload_duration: upload_duration
+            // };
 
             response = {
                 statusCode: '200',
-                body: message,//JSON.stringify(body),
+                body: message,
                 headers: {
                     'Content-Type': 'application/json'
                 }
