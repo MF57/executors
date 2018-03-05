@@ -8,35 +8,6 @@ const Promise = require('bluebird');
 const fs = require('fs');
 
 exports.handler = function (event, context) {
-    // const printDir = function (p) {
-    //     const path = require("path");
-    //
-    //     return new Promise(function (resolve, reject) {
-    //         fs.readdir(p, function (err, files) {
-    //             if (err) {
-    //                 throw err;
-    //             }
-    //
-    //             console.log("Logging all files");
-    //             console.log("FILES: " + files);
-    //
-    //             files.map(function (file) {
-    //                 return path.join(p, file);
-    //             }).filter(function (file) {
-    //                 return fs.statSync(file).isFile();
-    //             }).forEach(function (file) {
-    //                 const stats = fs.statSync(file);
-    //                 const fileSizeInBytes = stats["size"];
-    //                 //Convert the file size to megabytes (optional)
-    //                 const fileSizeInMegabytes = fileSizeInBytes / 1000000.0;
-    //
-    //                 console.log("%s (%s) (%s)", file, fileSizeInMegabytes, path.extname(file));
-    //             });
-    //             resolve();
-    //         });
-    //     })
-    // };
-
     console.log(event);
 
     const json_request = JSON.parse(event.body);
@@ -142,8 +113,6 @@ exports.handler = function (event, context) {
 
         console.log('spawning ' + proc_name);
         process.env.PATH = '.:' + __dirname; // add . and __dirname to PATH since e.g. in Montage mDiffFit calls external executables
-
-        console.log(process.env.PATH);
         const proc = spawn(proc_name, args, {cwd: '/tmp'});
 
         proc.on('error', function (code) {
@@ -247,16 +216,6 @@ exports.handler = function (event, context) {
             let message = 'AWS Lambda Function exit: start ' + total_start + ' end ' + total_end + ' duration ' + duration + ' ms, executable: ' + executable + ' args: ' + args;
             message += ' download time: ' + download_duration + ' ms, execution time: ' + execution_duration + ' ms, upload time ' + upload_duration + ' ms';
 
-            // const body = {
-            //     message: message,
-            //     duration: duration,
-            //     executable: executable,
-            //     args: args,
-            //     download_duration: download_duration,
-            //     execution_duration: execution_duration,
-            //     upload_duration: upload_duration
-            // };
-
             response = {
                 statusCode: '200',
                 body: message,
@@ -264,10 +223,39 @@ exports.handler = function (event, context) {
                     'Content-Type': 'application/json'
                 }
             };
-            console.log(response);
         }
 
         console.log(response);
         context.succeed(response);
     })
 };
+
+
+// const printDir = function (p) {
+//     const path = require("path");
+//
+//     return new Promise(function (resolve, reject) {
+//         fs.readdir(p, function (err, files) {
+//             if (err) {
+//                 throw err;
+//             }
+//
+//             console.log("Logging all files");
+//             console.log("FILES: " + files);
+//
+//             files.map(function (file) {
+//                 return path.join(p, file);
+//             }).filter(function (file) {
+//                 return fs.statSync(file).isFile();
+//             }).forEach(function (file) {
+//                 const stats = fs.statSync(file);
+//                 const fileSizeInBytes = stats["size"];
+//                 //Convert the file size to megabytes (optional)
+//                 const fileSizeInMegabytes = fileSizeInBytes / 1000000.0;
+//
+//                 console.log("%s (%s) (%s)", file, fileSizeInMegabytes, path.extname(file));
+//             });
+//             resolve();
+//         });
+//     })
+// };

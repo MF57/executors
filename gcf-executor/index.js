@@ -20,7 +20,6 @@ exports.hyperflow_executor = function (req, res) {
     console.log('executable: ' + executable);
     console.log('args:       ' + args);
     console.log('inputs:     ' + inputs);
-    console.log('inputs[0].name:     ' + inputs[0].name);
     console.log('outputs:    ' + outputs);
     console.log('bucket:     ' + bucket_name);
     console.log('prefix:     ' + prefix);
@@ -30,9 +29,20 @@ exports.hyperflow_executor = function (req, res) {
         projectId: projectId
     });
 
-    function download(callback) {
+    function download(waterfallCallback) {
 
-        async.each(inputs, function (file_name, callback) {
+        function iteratorCallback(file_name, next) {
+
+            function downloadFinishedCallback(err) {
+                if (err) {
+                    console.error("Error downloading file " + full_path);
+                    console.error(err);
+                    next(err);
+                } else {
+                    console.log("Downloaded file " + full_path);
+                    next();
+                }
+            }
 
             file_name = file_name.name;
             const full_path = bucket_name + "/" + prefix + "/" + file_name;
@@ -41,65 +51,79 @@ exports.hyperflow_executor = function (req, res) {
 
             // Reference an existing bucket.
             const bucket = gcs.bucket(bucket_name);
+            const downloadOptions = {destination: '/tmp/' + file_name};
 
             // Download a file from your bucket.
-            bucket.file(prefix + "/" + file_name).download({
-                destination: '/tmp/' + file_name
-            }, function (err) {
-                if (err) {
-                    console.error("Error downloading file " + full_path);
-                    console.error(err);
-                    callback(err);
-                } else {
-                    console.log("Downloaded file " + full_path);
-                    callback();
-                }
-            });
-        }, function (err) {
-            if (err) {
+            bucket.file(prefix + "/" + file_name).download(downloadOptions, downloadFinishedCallback);
+        }
+
+        function iterationFinishedCallback(error) {
+            if (error) {
                 console.error('A file failed to process');
-                callback('Error downloading')
+                waterfallCallback('Error downloading')
             } else {
                 console.log('All files have been downloaded successfully');
-                callback()
+                waterfallCallback()
             }
-        });
+        }
+
+        async.each(inputs, iteratorCallback, iterationFinishedCallback);
     }
 
 
-    function execute(callback) {
-        const proc_name = __dirname + '/' + executable; // use __dirname so we don't need to set env[PATH] and pass env
+    function execute(waterfallCallback) {
+
+        function errorCallback(code) {
+            console.error('Error: ' + executable + JSON.stringify(code));
+        }
+
+        function stdoutCallback(stdoutData) {
+            console.log('Stdout: ' + executable + stdoutData);
+        }
+
+        function stderrCallback(stderrData) {
+            console.log('Stderr: ' + executable + stderrData);
+        }
+
+        function executableCloseCallback(code) {
+            console.log('My GCF exe close ' + executable + ' with code ' + code);
+            waterfallCallback()
+        }
+
+        function executableExitCallback(code) {
+            console.log('My GCF exe exit' + executable + ' with code ' + code);
+        }
+
+        // use __dirname so we don't need to set env[PATH] and pass env
+        const proc_name = __dirname + '/' + executable;
 
         console.log('spawning ' + proc_name);
-        process.env.PATH = '.:' + __dirname; // add . and __dirname to PATH since e.g. in Montage mDiffFit calls external executables
+        // add . and __dirname to PATH since e.g. in Montage mDiffFit calls external executables
+        process.env.PATH = '.:' + __dirname;
         const proc = spawn(proc_name, args, {cwd: '/tmp'});
 
-        proc.on('error', function (code) {
-            console.error('error!!' + executable + JSON.stringify(code));
-        });
-
-        proc.stdout.on('data', function (exedata) {
-            console.log('Stdout: ' + executable + exedata);
-        });
-
-        proc.stderr.on('data', function (exedata) {
-            console.log('Stderr: ' + executable + exedata);
-        });
-
-        proc.on('close', function (code) {
-            console.log('My GCF exe close ' + executable + ' with code ' + code);
-            callback()
-        });
-
-        proc.on('exit', function (code) {
-            console.log('My GCF exe exit' + executable + ' with code ' + code);
-        });
+        proc.stdout.on('data', stdoutCallback);
+        proc.stderr.on('data', stderrCallback);
+        proc.on('error', errorCallback);
+        proc.on('close', executableCloseCallback);
+        proc.on('exit', executableExitCallback);
 
     }
 
-    function upload(callback) {
+    function upload(waterfallCallback) {
 
-        async.each(outputs, function (file_name, callback) {
+        function iteratorCallback(file_name, next) {
+
+            function uploadFinishedCallback(err) {
+                if (err) {
+                    console.error("Error uploading file " + full_path);
+                    console.error(err);
+                    next(err);
+                } else {
+                    console.log("Uploaded file " + full_path);
+                    next();
+                }
+            }
 
             file_name = file_name.name;
 
@@ -108,44 +132,41 @@ exports.hyperflow_executor = function (req, res) {
 
             // Reference an existing bucket.
             const bucket = gcs.bucket(bucket_name);
+            const uploadOptions = {destination: prefix + "/" + file_name};
+
 
             // Upload a file to your bucket.
-            bucket.upload('/tmp/' + file_name, {destination: prefix + "/" + file_name}, function (err) {
-                if (err) {
-                    console.error("Error uploading file " + full_path);
-                    console.error(err);
-                    callback(err);
-                } else {
-                    console.log("Uploaded file " + full_path);
-                    callback();
-                }
-            });
-        }, function (err) {
+            bucket.upload('/tmp/' + file_name, uploadOptions, uploadFinishedCallback);
+        }
+
+        function iterationFinishedCallback(err) {
             if (err) {
                 console.error('A file failed to process');
-                callback('Error uploading')
+                waterfallCallback('Error uploading')
             } else {
                 console.log('All files have been uploaded successfully');
-                callback()
+                waterfallCallback()
             }
-        });
+        }
+
+        async.each(outputs, iteratorCallback, iterationFinishedCallback);
     }
 
 
-    async.waterfall([
-        download,
-        execute,
-        upload
-    ], function (err) {
-        if (err) {
-            console.error('Error: ' + err);
-            res.status(400).send('Bad Request ' + JSON.stringify(err));
+    function waterfallCallback(error) {
+        if (error) {
+            console.error('Error: ' + error);
+            res.status(400).send('Bad Request ' + JSON.stringify(error));
         } else {
             console.log('Success');
             t_end = Date.now();
             const duration = t_end - t_start;
-            res.send('GCF Function exit: start ' + t_start + ' end ' + t_end + ' duration ' + duration + ' ms, executable: ' + executable + ' args: ' + args);
+            res.send('GCF Function exit: start ' + t_start + ' end ' + t_end + ' duration '
+                + duration + ' ms, executable: ' + executable + ' args: ' + args);
         }
-    })
+    }
 
+
+    const waterfallTasks = [download, execute, upload];
+    async.waterfall(waterfallTasks, waterfallCallback);
 };
