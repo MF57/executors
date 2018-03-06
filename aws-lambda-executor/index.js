@@ -1,8 +1,11 @@
-const exec = require('child_process').exec;
-const async = require('async');
-
 exports.handler = function (event, context) {
-    console.log(event);
+
+    const async = require('async');
+    const cleaner = require('./cleaner');
+    const downloader = require('./download');
+    const executor = require('./execute');
+    const uploader = require('./upload');
+
 
     const json_request = JSON.parse(event.body);
 
@@ -32,21 +35,8 @@ exports.handler = function (event, context) {
     console.log('bucket:     ' + bucket_name);
     console.log('prefix:     ' + prefix);
 
-
-    function clearTmp(callback) {
-        console.log("Clearing tmp directory");
-        exec('rm ./tmp/*', function () {
-            console.log("Tmp directory cleared");
-            callback();
-        });
-    }
-
-
-    const executor = require('./execute');
-    const uploader = require('./upload');
-    const downloader = require('./download');
     async.waterfall([
-        clearTmp,
+        async.apply(cleaner.clean),
         async.apply(downloader.download, inputs, bucket_name, prefix),
         async.apply(executor.execute, executable, args),
         async.apply(uploader.upload, outputs, bucket_name, prefix)
