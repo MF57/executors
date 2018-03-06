@@ -1,11 +1,5 @@
-const spawn = require('child_process').spawn;
 const exec = require('child_process').exec;
-
-const AWS = require('aws-sdk');
 const async = require('async');
-const s3 = new AWS.S3({signatureVersion: 'v4'});
-const Promise = require('bluebird');
-const fs = require('fs');
 
 exports.handler = function (event, context) {
     console.log(event);
@@ -26,9 +20,9 @@ exports.handler = function (event, context) {
     const total_start = Date.now();
     let total_end;
 
-    let download_start;
-    let execute_start;
-    let upload_start;
+    let download_start = Date.now();
+    let execute_start = Date.now();
+    let upload_start = Date.now();
 
     console.log('executable: ' + executable);
     console.log('args:       ' + args);
@@ -47,159 +41,23 @@ exports.handler = function (event, context) {
         });
     }
 
-    function download(callback) {
-        download_start = Date.now();
-        async.each(inputs, function (file_name, callback) {
-            file_name = file_name.name;
-            console.log('Downloading ' + bucket_name + "/" + prefix + "/" + file_name);
 
-            // Reference an existing bucket.
-            const params = {
-                Bucket: bucket_name,
-                Key: prefix + '/' + file_name
-            };
-
-            const file = fs.createWriteStream('/tmp/' + file_name);
-
-            new Promise(function (resolve, reject) {
-                file
-                    .on('open', function () {
-                        console.log('File OPENED ' + '/tmp/' + file_name);
-                        resolve();
-                    })
-                    .on('error', function (err) {
-                        console.log("FILE OPEN ERROR " + err);
-                        reject(err);
-                    })
-                    .on('finish', function () {
-                        console.log("FILE OPEN FINISH");
-                        resolve();
-                    });
-            }).then(function() {
-                return new Promise(function (resolve, reject) {
-                    s3.getObject(params).createReadStream().on('end', function () {
-                        return resolve();
-                    }).on('error', function (error) {
-                        return reject(error);
-                    }).pipe(file)
-                }).then(function () {
-                    callback();
-                }, function (err) {
-                    err['file_name'] = file_name;
-                    callback(err);
-                });
-            });
-
-        }, function (err) {
-            if (err) {
-                console.log('A file failed to process ' + err.file_name);
-                callback('Error downloading ' + err);
-            } else {
-                // printDir('/tmp').then(function (result) {
-                //     callback()
-                // }, function (err) {
-                //     callback(err)
-                // });
-                console.log('All files have been downloaded successfully');
-                callback();
-            }
-        });
-    }
-
-
-    function execute(callback) {
-        execute_start = Date.now();
-        const proc_name = __dirname + '/' + executable; // use __dirname so we don't need to set env[PATH] and pass env
-
-        console.log('spawning ' + proc_name);
-        process.env.PATH = '.:' + __dirname; // add . and __dirname to PATH since e.g. in Montage mDiffFit calls external executables
-        const proc = spawn(proc_name, args, {cwd: '/tmp'});
-
-        proc.on('error', function (code) {
-            console.error('error!!' + executable + JSON.stringify(code));
-        });
-
-        proc.stdout.on('data', function (exedata) {
-            console.log('Stdout: ' + executable + exedata);
-           // printDir('/tmp').then(function(result) { callback() }, function(err) { callback(err) });
-        });
-
-        proc.stderr.on('data', function (exedata) {
-            console.log(executable + ' stderr:'  + exedata);
-           // printDir('/tmp').then(function(result) { callback() }, function(err) { callback(err) });
-            callback(exedata);
-        });
-
-        proc.on('close', function (code) {
-            console.log('Lambda exe close' + executable  + ' with code ' + code);
-            callback();
-           //  printDir('/tmp').then(function(result) { callback() }, function(err) { callback(err) });
-        });
-
-        proc.on('exit', function (code) {
-            console.log('Lambda exe exit' + executable + ' with code ' + code);
-        });
-
-    }
-
-    function upload(callback) {
-        upload_start = Date.now();
-        async.each(outputs, function (file_name, callback) {
-
-            file_name = file_name.name;
-
-            const full_path = bucket_name + "/" + prefix + "/" + file_name;
-            console.log('uploading ' + full_path);
-
-            const fileStream = fs.createReadStream('/tmp/' + file_name);
-            fileStream.on('error', function (err) {
-                if (err) {
-                    console.error(err);
-                    callback(err);
-                }
-            });
-            fileStream.on('open', function () {
-                const params = {
-                    Bucket: bucket_name,
-                    Key: prefix + '/' + file_name,
-                    Body: fileStream
-                };
-
-                s3.putObject(params, function (err) {
-                    if (err) {
-                        console.error("Error uploading file " + full_path);
-                        console.error(err);
-                        callback(err);
-                    } else {
-                        console.log("Uploaded file " + full_path);
-                        callback();
-                    }
-                });
-            });
-
-        }, function (err) {
-            if (err) {
-                console.error('A file failed to process');
-                callback('Error uploading')
-            } else {
-                console.log('All files have been uploaded successfully');
-                callback()
-            }
-        });
-    }
-
-
+    const executor = require('./execute');
+    const uploader = require('./upload');
+    const downloader = require('./download');
     async.waterfall([
         clearTmp,
-        download,
-        execute,
-        upload
-    ], function (err) {
+        async.apply(downloader.download, inputs, bucket_name, prefix),
+        async.apply(executor.execute, executable, args),
+        async.apply(uploader.upload, outputs, bucket_name, prefix)
+    ], waterfallCallback);
+
+    function waterfallCallback(error) {
         let response;
-        if (err) {
+        if (error) {
             response = {
                 statusCode: '400',
-                body: JSON.stringify({message: err}),
+                body: JSON.stringify({message: error}),
                 headers: {
                     'Content-Type': 'application/json'
                 }
@@ -227,7 +85,7 @@ exports.handler = function (event, context) {
 
         console.log(response);
         context.succeed(response);
-    })
+    }
 };
 
 
