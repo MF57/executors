@@ -33,11 +33,12 @@ exports.handler = function (event, context) {
     console.log('bucket:     ' + bucket_name);
     console.log('prefix:     ' + prefix);
 
-    async.waterfall([
+     const waterfallTasks = [
         async.apply(downloader.download, inputs, bucket_name, prefix),
         async.apply(executor.execute, executable, args),
         async.apply(uploader.upload, outputs, bucket_name, prefix)
-    ], waterfallCallback);
+    ];
+    async.waterfall(waterfallTasks, waterfallCallback);
 
     function waterfallCallback(error) {
         let response;
