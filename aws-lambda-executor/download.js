@@ -1,13 +1,60 @@
 module.exports = {
     download: function (inputs, bucket_name, prefix, waterfallCallback) {
-        const async = require('async');
-        const AWS = require('aws-sdk');
-        const s3 = new AWS.S3({signatureVersion: 'v4'});
-        const Promise = require('bluebird');
-        const fs = require('fs');
 
-        let download_start = Date.now();
-        async.each(inputs, function (file_name, callback) {
+        function iteratorCallback(file_name, next) {
+
+            function openFileLocally(resolve, reject) {
+
+                function fileOpenCallback() {
+                    console.log('File OPENED ' + '/tmp/' + file_name);
+                    resolve();
+                }
+
+                function fileErrorCallback(error) {
+                    console.log("FILE OPEN ERROR " + error);
+                    reject(error);
+                }
+
+                function fileOpenFinishedCallback() {
+                    console.log("FILE OPEN FINISH");
+                    resolve();
+                }
+
+                file.on('open', fileOpenCallback)
+                    .on('error', fileErrorCallback)
+                    .on('finish', fileOpenFinishedCallback);
+            }
+
+            function copyContentFromS3() {
+
+                function downloadFile(resolve, reject) {
+
+                    function s3ConnectionSuccessful() {
+                        return resolve();
+                    }
+
+                    function s3ConnectionFailed(error) {
+                        return reject(error);
+                    }
+
+                    s3.getObject(params).createReadStream()
+                        .on('end', s3ConnectionSuccessful)
+                        .on('error', s3ConnectionFailed)
+                        .pipe(file)
+                }
+
+                function downloadSuccessCallback() {
+                    next();
+                }
+
+                function downloadErrorCallback(error) {
+                    error['file_name'] = file_name;
+                    next(error);
+                }
+
+                return new Promise(downloadFile).then(downloadSuccessCallback, downloadErrorCallback);
+            }
+
             file_name = file_name.name;
             console.log('Downloading ' + bucket_name + "/" + prefix + "/" + file_name);
 
@@ -18,44 +65,28 @@ module.exports = {
             };
 
             const file = fs.createWriteStream('/tmp/' + file_name);
+            new Promise(openFileLocally).then(copyContentFromS3);
 
-            new Promise(function (resolve, reject) {
-                file
-                    .on('open', function () {
-                        console.log('File OPENED ' + '/tmp/' + file_name);
-                        resolve();
-                    })
-                    .on('error', function (err) {
-                        console.log("FILE OPEN ERROR " + err);
-                        reject(err);
-                    })
-                    .on('finish', function () {
-                        console.log("FILE OPEN FINISH");
-                        resolve();
-                    });
-            }).then(function () {
-                return new Promise(function (resolve, reject) {
-                    s3.getObject(params).createReadStream().on('end', function () {
-                        return resolve();
-                    }).on('error', function (error) {
-                        return reject(error);
-                    }).pipe(file)
-                }).then(function () {
-                    callback();
-                }, function (err) {
-                    err['file_name'] = file_name;
-                    callback(err);
-                });
-            });
+        }
 
-        }, function (err) {
-            if (err) {
-                console.log('A file failed to process ' + err.file_name);
-                waterfallCallback('Error downloading ' + err);
+        function iterationFinishedCallback(error) {
+            if (error) {
+                console.log('A file failed to process ' + error.file_name);
+                waterfallCallback('Error downloading ' + error);
             } else {
                 console.log('All files have been downloaded successfully');
                 waterfallCallback();
             }
-        });
+        }
+
+
+        const async = require('async');
+        const AWS = require('aws-sdk');
+        const s3 = new AWS.S3({signatureVersion: 'v4'});
+        const Promise = require('bluebird');
+        const fs = require('fs');
+
+        let download_start = Date.now();
+        async.each(inputs, iteratorCallback, iterationFinishedCallback);
     }
 };

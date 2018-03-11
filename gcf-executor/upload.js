@@ -3,11 +3,11 @@ module.exports = {
 
         function iteratorCallback(file_name, next) {
 
-            function uploadFinishedCallback(err) {
-                if (err) {
+            function uploadFinishedCallback(error) {
+                if (error) {
                     console.error("Error uploading file " + full_path);
-                    console.error(err);
-                    next(err);
+                    console.error(error);
+                    next(error);
                 } else {
                     console.log("Uploaded file " + full_path);
                     next();
