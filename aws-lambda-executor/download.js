@@ -90,3 +90,32 @@ module.exports = {
         async.each(inputs, iteratorCallback, iterationFinishedCallback);
     }
 };
+
+// const printDir = function (p) {
+//     const path = require("path");
+//
+//     return new Promise(function (resolve, reject) {
+//         fs.readdir(p, function (err, files) {
+//             if (err) {
+//                 throw err;
+//             }
+//
+//             console.log("Logging all files");
+//             console.log("FILES: " + files);
+//
+//             files.map(function (file) {
+//                 return path.join(p, file);
+//             }).filter(function (file) {
+//                 return fs.statSync(file).isFile();
+//             }).forEach(function (file) {
+//                 const stats = fs.statSync(file);
+//                 const fileSizeInBytes = stats["size"];
+//                 //Convert the file size to megabytes (optional)
+//                 const fileSizeInMegabytes = fileSizeInBytes / 1000000.0;
+//
+//                 console.log("%s (%s) (%s)", file, fileSizeInMegabytes, path.extname(file));
+//             });
+//             resolve();
+//         });
+//     })
+// };
