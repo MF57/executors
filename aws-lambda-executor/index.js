@@ -6,22 +6,25 @@ exports.hyperflow_executor = function (req, res) {
     const uploader = require('./upload');
     const response_handler = require('./response_handler');
 
-    const executable = req.body.executable;
-    const args = req.body.args;
-    const inputs = req.body.inputs;
-    const outputs = req.body.outputs;
-
-    let bucket_name, prefix;
+    let bucket_name, prefix, executable, args, inputs, outputs;
 
     if (typeof req.body.options === 'undefined') {
         //AWS
         const json_request = JSON.parse(req.body);
         bucket_name = json_request.options.bucket;
         prefix = json_request.options.prefix;
+        executable = json_request.executable;
+        args = json_request.args;
+        inputs = json_request.inputs;
+        outputs = json_request.outputs;
     } else {
         //GCF
         bucket_name = req.body.options.bucket;
         prefix = req.body.options.prefix;
+        executable = req.body.executable;
+        args = req.body.args;
+        inputs = req.body.inputs;
+        outputs = req.body.outputs;
     }
 
     const total_start = Date.now();
