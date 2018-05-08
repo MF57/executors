@@ -38,6 +38,8 @@ amqp.connect('amqp://localhost', function (err, conn) {
             // });
 
             const message = JSON.parse(msg.content.toString());
+            message.options.bucket = message.options[cloudProvider.name+'Bucket'];
+            message.options.prefix = message.options[cloudProvider.name+'Prefix'];
 
 
             function responseCallback(error, response, body) {
