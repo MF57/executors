@@ -29,13 +29,6 @@ amqp.connect('amqp://localhost', function (err, conn) {
         ch.assertQueue(q, {durable: true});
         console.log(" [*] Waiting for messages in %s. To exit press CTRL+C", q);
         ch.consume(q, function (msg) {
-            //  console.log(msg.properties.replyTo);
-
-            // ch.assertQueue(msg.properties.replyTo, {exclusive: true, autoDelete: true});
-            // ch.sendToQueue(msg.properties.replyTo, new Buffer("YAAAAAAAAAY"), {
-            //     contentType: 'application/json',
-            //     correlationId: msg.properties.correlationId
-            // });
 
             const message = JSON.parse(msg.content.toString());
             message.options.bucket = message.options[cloudProvider.name+'Bucket'];
@@ -47,14 +40,21 @@ amqp.connect('amqp://localhost', function (err, conn) {
 
                 if (error) {
                     console.log("Function: " + message.executable + " error: " + error);
+                    //todo send error to hyperflow
                     // hyperflow_callback(error, outs);
                     return
                 }
                 if (response) {
-                    console.log("Function: " + message.executable + " response status code: " + response.statusCode + " number of request attempts: " + response.attempts)
+                   console.log("Function: " + message.executable + " response status code: " +
+                       response.statusCode + " number of request attempts: " + response.attempts)
                 }
                 console.log("Function: " + message.executable + " data: " + body.toString());
-                //hyperflow_callback(null, outs);
+                ch.sendToQueue(msg.properties.replyTo, new Buffer(JSON.stringify(message)), {
+                    contentType: 'application/json',
+                    correlationId: msg.properties.correlationId
+                });
+                ch.ack(msg);
+
             }
 
 
