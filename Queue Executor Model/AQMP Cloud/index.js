@@ -49,7 +49,7 @@ amqp.connect('amqp://localhost', function (err, conn) {
                        response.statusCode + " number of request attempts: " + response.attempts)
                 }
                 console.log("Function: " + message.executable + " data: " + body.toString());
-                ch.sendToQueue(msg.properties.replyTo, new Buffer(JSON.stringify(message)), {
+                ch.sendToQueue(msg.properties.replyTo, Buffer.from(JSON.stringify(message)), {
                     contentType: 'application/json',
                     correlationId: msg.properties.correlationId
                 });
