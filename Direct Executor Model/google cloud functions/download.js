@@ -3,17 +3,17 @@ module.exports = {
 
         function iteratorCallback(file_name, next) {
 
-            function downloadFinishedCallback(error) {
-                if (error) {
-                    console.log("File " + file_name + " download error: " + error + " - terminating");
-                    error['file_name'] = file_name;
-                    next(error);
-                } else {
-                    if (verbose) {
-                        console.log("Downloaded file " + full_path);
-                    }
-                    next();
+            function downloadSuccessCallback() {
+                if (verbose) {
+                    console.log("Downloaded file " + full_path);
                 }
+                next();
+            }
+
+            function downloadErrorCallback(error) {
+                console.log("File " + file_name + " download error: " + error + " - terminating");
+                error['file_name'] = file_name;
+                next(error);
             }
 
             file_name = file_name.name;
@@ -27,8 +27,17 @@ module.exports = {
             const downloadOptions = {destination: '/tmp/' + file_name};
 
 
+            let promiseRetry = require('promise-retry');
+            return promiseRetry(function (retry, number) {
+                if (verbose || number > 1) {
+                    console.log('Attempt to download ' + file_name + " - attempt number ", number);
+                }
+                return bucket.file(prefix + "/" + file_name).download(downloadOptions).catch(retry);
+            }, {retries: 5}).then(downloadSuccessCallback, downloadErrorCallback);
+
+
             // Download a file from your bucket.
-            bucket.file(prefix + "/" + file_name).download(downloadOptions, downloadFinishedCallback);
+            bucket.file(prefix + "/" + file_name).download(downloadOptions, downloadSuccessCallback);
         }
 
         function iterationFinishedCallback(error) {

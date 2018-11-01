@@ -1,6 +1,7 @@
 {
 	"dependencies": {
+		"async": "^1.5.2",
 		"google-cloud": "^0.57.0",
-		"async": "^1.5.2"
+		"promise-retry": "^1.1.1"
 	}
 }
