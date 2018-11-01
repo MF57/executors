@@ -34,10 +34,6 @@ module.exports = {
                 }
                 return bucket.file(prefix + "/" + file_name).download(downloadOptions).catch(retry);
             }, {retries: 5}).then(downloadSuccessCallback, downloadErrorCallback);
-
-
-            // Download a file from your bucket.
-            bucket.file(prefix + "/" + file_name).download(downloadOptions, downloadSuccessCallback);
         }
 
         function iterationFinishedCallback(error) {

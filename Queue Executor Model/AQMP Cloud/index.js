@@ -41,15 +41,24 @@ amqp.connect('amqp://localhost', function (err, conn) {
                     response.statusCode + " number of request attempts: " + response.attempts);
 
                 if (error || response.statusCode !== 200) {
-                    console.log("Function: " + executable + " error: " + error);
-                    console.log(response.body);
-                    //todo send error to hyperflow
-                    // hyperflow_callback(error, outs);
+                    if (error) {
+                        console.log("Function: " + message.executable + " error: " + error);
+                    }
+                    const error_message = (response.body.message) ? response.body.message : response.body;
+                    console.log("Function: " + message.executable + " error: " + error_message);
+                    message.exit_status = 1;
+                    message.error = error_message;
+                    ch.sendToQueue(msg.properties.replyTo, Buffer.from(JSON.stringify(message)), {
+                        contentType: 'application/json',
+                        correlationId: msg.properties.correlationId
+                    });
+                    ch.ack(msg);
                     return
                 }
                 if (verbose) {
                     console.log("Function: " + message.executable + " data: " + body.toString());
                 }
+                message.exit_status = 0;
                 ch.sendToQueue(msg.properties.replyTo, Buffer.from(JSON.stringify(message)), {
                     contentType: 'application/json',
                     correlationId: msg.properties.correlationId
@@ -65,10 +74,11 @@ amqp.connect('amqp://localhost', function (err, conn) {
                 console.log("Executing:  " + message.executable);
             }
 
-            function myRetryStrategy(err, response, body){
+            function myRetryStrategy(err, response){
                 // retry the request if we had an error or if the response was a 'Bad Gateway'
                 if (response && response.statusCode && response.statusCode !== 200) {
-                    console.log(message.executable + " - " + response.statusCode + " - " + response.body.message);
+                    const error_message = (response.body.message) ? response.body.message : response.body;
+                    console.log(message.executable + " - " + response.statusCode + " - " + error_message + " - retrying");
                 }
                 return err || !response || response.statusCode !== 200;
             }
@@ -77,7 +87,7 @@ amqp.connect('amqp://localhost', function (err, conn) {
                 timeout: 600000,
                 retryStrategy: myRetryStrategy,
                 url: cloudProvider.url,
-                maxAttempts: 5,   // (default) try 5 times
+                maxAttempts: 2,   // (default) try 5 times
                 retryDelay: 5000,  // (default) wait for 5s before trying again
                 json: message,
                 headers: {'Content-Type': 'application/json', 'Accept': '*/*'}
