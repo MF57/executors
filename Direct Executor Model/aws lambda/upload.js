@@ -1,5 +1,5 @@
 module.exports = {
-    upload: function(outputs, bucket_name, prefix, waterfallCallback) {
+    upload: function(outputs, bucket_name, prefix, verbose, waterfallCallback) {
 
         function iteratorCallback(file_name, next) {
 
@@ -7,11 +7,13 @@ module.exports = {
 
                 function uploadFinishedCallback(error) {
                     if (error) {
-                        console.error("Error uploading file " + full_path);
-                        console.error(error);
+                        console.log("File " + file_name + " upload finished error: " + error + " - terminating");
+                        error['file_name'] = file_name;
                         next(error);
                     } else {
-                        console.log("Uploaded file " + full_path);
+                        if (verbose) {
+                            console.log("Uploaded file " + full_path);
+                        }
                         next();
                     }
                 }
@@ -26,7 +28,8 @@ module.exports = {
 
             function fileErrorCallback(error) {
                 if (error) {
-                    console.error(error);
+                    console.log("File " + file_name + " upload file  error: " + error + " - terminating");
+                    error['file_name'] = file_name;
                     next(error);
                 }
             }
@@ -35,7 +38,9 @@ module.exports = {
             file_name = file_name.name;
 
             const full_path = bucket_name + "/" + prefix + "/" + file_name;
-            console.log('uploading ' + full_path);
+            if (verbose) {
+                console.log('uploading ' + full_path);
+            }
 
             const fileStream = fs.createReadStream('/tmp/' + file_name);
             fileStream.on('error', fileErrorCallback);
@@ -44,10 +49,12 @@ module.exports = {
 
         function iteratorFinishedCallback(error) {
             if (error) {
-                console.error('A file failed to process');
+                console.log('A file failed to process ' + error.file_name);
                 waterfallCallback('Error uploading')
             } else {
-                console.log('All files have been uploaded successfully');
+                if (verbose) {
+                    console.log('All files have been uploaded successfully');
+                }
                 waterfallCallback()
             }
         }
@@ -58,7 +65,6 @@ module.exports = {
         const s3 = new AWS.S3({signatureVersion: 'v4'});
 
 
-        const upload_start = Date.now();
         async.each(outputs, iteratorCallback, iteratorFinishedCallback);
     }
 };

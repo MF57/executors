@@ -2,6 +2,8 @@
   "dependencies": {
     "async": "^1.5.2",
     "aws-sdk": "^2.163.0",
-    "bluebird": "^3.5.1"
+    "bluebird": "^3.5.1",
+    "get-folder-size": "^2.0.0",
+    "promise-retry": "^1.1.1"
   }
 }

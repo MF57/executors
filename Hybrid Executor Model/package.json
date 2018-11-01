@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "amqplib": "",
+    "jsonfile": "^5.0.0",
+    "requestretry": ""
+  }
+}

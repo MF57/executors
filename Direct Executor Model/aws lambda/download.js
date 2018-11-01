@@ -1,22 +1,23 @@
 module.exports = {
-    download: function (inputs, bucket_name, prefix, waterfallCallback) {
+    download: function (inputs, bucket_name, prefix, verbose, waterfallCallback) {
 
         function iteratorCallback(file_name, next) {
 
             function openFileLocally(resolve, reject) {
 
                 function fileOpenCallback() {
-                    console.log('File OPENED ' + '/tmp/' + file_name);
+                    if (verbose) {
+                        console.log('File OPENED ' + '/tmp/' + file_name);
+                    }
                     resolve();
                 }
 
                 function fileErrorCallback(error) {
-                    console.log("FILE OPEN ERROR " + error);
+                    console.log("File " + file_name + " open error: " + error);
                     reject(error);
                 }
 
                 function fileOpenFinishedCallback() {
-                    console.log("FILE OPEN FINISH");
                     resolve();
                 }
 
@@ -34,31 +35,51 @@ module.exports = {
                     }
 
                     function s3ConnectionFailed(error) {
+                        console.log("File " + file_name + " download error: " + error + " - retrying");
                         return reject(error);
                     }
+
 
                     s3.getObject(params).createReadStream()
                         .on('end', s3ConnectionSuccessful)
                         .on('error', s3ConnectionFailed)
-                        .pipe(file)
+                        .pipe(file);
+
                 }
 
                 function downloadSuccessCallback() {
+                    if (verbose) {
+                        //Confirm that the file has been downloaded
+                        const fs = require("fs"); //Load the filesystem module
+                        const stats = fs.statSync("/tmp/"+file_name);
+                        const fileSizeInBytes = stats.size;
+                        console.log("Downloaded: " + file_name + " - " + fileSizeInBytes + " bytes");
+                    }
                     next();
                 }
 
                 function downloadErrorCallback(error) {
+                    console.log("File " + file_name + " download error: " + error + " - terminating");
                     error['file_name'] = file_name;
                     next(error);
                 }
 
-                return new Promise(downloadFile).then(downloadSuccessCallback, downloadErrorCallback);
+
+                let promiseRetry = require('promise-retry');
+                return promiseRetry(function (retry, number) {
+                   if (verbose || number > 1) {
+                        console.log('Attempt to download ' + file_name + " - attempt number ", number);
+                   }
+                    return new Promise(downloadFile).catch(retry);
+                }, {retries: 5}).then(downloadSuccessCallback, downloadErrorCallback);
+
             }
 
             file_name = file_name.name;
-            console.log('Downloading ' + bucket_name + "/" + prefix + "/" + file_name);
+            if (verbose) {
+                console.log('Downloading ' + bucket_name + "/" + prefix + "/" + file_name);
+            }
 
-            // Reference an existing bucket.
             const params = {
                 Bucket: bucket_name,
                 Key: prefix + '/' + file_name
@@ -74,7 +95,9 @@ module.exports = {
                 console.log('A file failed to process ' + error.file_name);
                 waterfallCallback('Error downloading ' + error);
             } else {
-                console.log('All files have been downloaded successfully');
+                if (verbose) {
+                    console.log('All files have been downloaded successfully');
+                }
                 waterfallCallback();
             }
         }
@@ -86,36 +109,6 @@ module.exports = {
         const Promise = require('bluebird');
         const fs = require('fs');
 
-        let download_start = Date.now();
         async.each(inputs, iteratorCallback, iterationFinishedCallback);
     }
 };
-
-// const printDir = function (p) {
-//     const path = require("path");
-//
-//     return new Promise(function (resolve, reject) {
-//         fs.readdir(p, function (err, files) {
-//             if (err) {
-//                 throw err;
-//             }
-//
-//             console.log("Logging all files");
-//             console.log("FILES: " + files);
-//
-//             files.map(function (file) {
-//                 return path.join(p, file);
-//             }).filter(function (file) {
-//                 return fs.statSync(file).isFile();
-//             }).forEach(function (file) {
-//                 const stats = fs.statSync(file);
-//                 const fileSizeInBytes = stats["size"];
-//                 //Convert the file size to megabytes (optional)
-//                 const fileSizeInMegabytes = fileSizeInBytes / 1000000.0;
-//
-//                 console.log("%s (%s) (%s)", file, fileSizeInMegabytes, path.extname(file));
-//             });
-//             resolve();
-//         });
-//     })
-// };

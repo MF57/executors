@@ -1,23 +1,26 @@
 module.exports = {
-    download: function (inputs, bucket_name, prefix, waterfallCallback) {
+    download: function (inputs, bucket_name, prefix, verbose, waterfallCallback) {
 
         function iteratorCallback(file_name, next) {
 
-            function downloadFinishedCallback(err) {
-                if (err) {
-                    console.error("Error downloading file " + full_path);
-                    console.error(err);
-                    next(err);
+            function downloadFinishedCallback(error) {
+                if (error) {
+                    console.log("File " + file_name + " download error: " + error + " - terminating");
+                    error['file_name'] = file_name;
+                    next(error);
                 } else {
-                    console.log("Downloaded file " + full_path);
+                    if (verbose) {
+                        console.log("Downloaded file " + full_path);
+                    }
                     next();
                 }
             }
 
             file_name = file_name.name;
             const full_path = bucket_name + "/" + prefix + "/" + file_name;
-            console.log('downloading ' + full_path);
-
+            if (verbose) {
+                console.log('Downloading ' + full_path);
+            }
 
             // Reference an existing bucket.
             const bucket = gcs.bucket(bucket_name);
@@ -30,11 +33,13 @@ module.exports = {
 
         function iterationFinishedCallback(error) {
             if (error) {
-                console.error('A file failed to process');
-                waterfallCallback('Error downloading')
+                console.log('A file failed to process ' + error.file_name);
+                waterfallCallback('Error downloading ' + error);
             } else {
-                console.log('All files have been downloaded successfully');
-                waterfallCallback()
+                if (verbose) {
+                    console.log('All files have been downloaded successfully');
+                }
+                waterfallCallback();
             }
         }
 

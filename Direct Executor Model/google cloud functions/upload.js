@@ -1,27 +1,31 @@
 module.exports = {
-    upload: function(outputs, bucket_name, prefix, waterfallCallback) {
+    upload: function (outputs, bucket_name, prefix, verbose, waterfallCallback) {
 
         function iteratorCallback(file_name, next) {
 
             function uploadFinishedCallback(error) {
                 if (error) {
-                    console.error("Error uploading file " + full_path);
-                    console.error(error);
+                    console.log("File " + file_name + " upload finished error: " + error + " - terminating");
+                    error['file_name'] = file_name;
                     next(error);
                 } else {
-                    console.log("Uploaded file " + full_path);
+                    if (verbose) {
+                        console.log("Uploaded file " + full_path);
+                    }
                     next();
                 }
             }
 
             file_name = file_name.name;
             const full_path = bucket_name + "/" + prefix + "/" + file_name;
-            console.log('uploading ' + full_path);
+            if (verbose) {
+                console.log('Uploading ' + full_path);
+            }
 
 
             // Reference an existing bucket.
             const bucket = gcs.bucket(bucket_name);
-            const uploadOptions = {destination: prefix + "/" + file_name};
+            const uploadOptions = {destination: prefix + "/" + file_name, resumable: false};
 
 
             // Upload a file to your bucket.
@@ -30,10 +34,12 @@ module.exports = {
 
         function iterationFinishedCallback(error) {
             if (error) {
-                console.error('A file failed to process');
+                console.log('A file failed to process ' + error.file_name);
                 waterfallCallback('Error uploading')
             } else {
-                console.log('All files have been uploaded successfully');
+                if (verbose) {
+                    console.log('All files have been uploaded successfully');
+                }
                 waterfallCallback()
             }
         }
