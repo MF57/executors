@@ -23,16 +23,14 @@ const cloudProvider = availableCloudProviders.find(cloudProvider => cloudProvide
 console.log("Running for cloud provider: " + cloudProvider.name);
 
 amqp.connect('amqp://localhost', function (err, conn) {
-    conn.createChannel(function (err, ch) {
+    conn.createChannel((err, ch) => {
         const q = 'hyperflow.jobs';
 
         ch.assertQueue(q, {durable: true});
         console.log(" [*] Waiting for messages in %s. To exit press CTRL+C", q);
-        ch.consume(q, function (msg) {
+        ch.consume(q, msg => {
 
             const message = JSON.parse(msg.content.toString());
-            message.options.bucket = message.options[cloudProvider.name+'Bucket'];
-            message.options.prefix = message.options[cloudProvider.name+'Prefix'];
             const verbose = message.verbose;
 
 
@@ -74,7 +72,7 @@ amqp.connect('amqp://localhost', function (err, conn) {
                 console.log("Executing:  " + message.executable);
             }
 
-            function myRetryStrategy(err, response){
+            function myRetryStrategy(err, response) {
                 // retry the request if we had an error or if the response was a 'Bad Gateway'
                 if (response && response.statusCode && response.statusCode !== 200) {
                     const error_message = (response.body.message) ? response.body.message : response.body;
@@ -87,7 +85,7 @@ amqp.connect('amqp://localhost', function (err, conn) {
                 timeout: 600000,
                 retryStrategy: myRetryStrategy,
                 url: cloudProvider.url,
-                maxAttempts: 2,   // (default) try 5 times
+                maxAttempts: 5,   // (default) try 5 times
                 retryDelay: 5000,  // (default) wait for 5s before trying again
                 json: message,
                 headers: {'Content-Type': 'application/json', 'Accept': '*/*'}
